@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  /* Branding SIANDOR Colors */
+  --color-hijau-tua: #0A5741;
+  --color-hijau: #1A7A58;
+  --color-hijau-muda: #28A373;
+  --color-hijau-terang: #3DD68C;
+  --color-hijau-pale: #E8F7F1;
+  --color-hijau-light: #C5EDDB;
+  --color-emas: #C9922E;
+  --color-emas-muda: #F0B94A;
+  --color-emas-pale: #FDF3E0;
+  --color-merah: #D14343;
+  --color-biru: #2563EB;
+  --color-biru-muda: #DBEAFE;
+  --color-abu: #64748B;
+  --color-abu-muda: #F1F5F9;
+  --color-putih: #FFFFFF;
+  --color-hitam: #0F1A14;
+  --color-border: #D1D9D5;
+  --color-latar: #F6FAF8;
+
+  /* Custom Spacing & Typography */
+  --spacing-sidebar: 260px;
+  --spacing-topbar: 72px;
+  --text-xxs: 10px;
+}
+
+body {
+  background-color: var(--color-latar);
+  color: var(--color-hitam);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: var(--color-hijau-light); border-radius: 10px; }
