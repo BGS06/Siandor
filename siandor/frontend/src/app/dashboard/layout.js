@@ -92,7 +92,6 @@ export default function DashboardLayout({ children }) {
     if (filePendukung) dataToSend.append("file", filePendukung);
 
     try {
-      // PERUBAHAN DI SINI: URL diubah menjadi "/api/surat"
       const response = await fetch("/api/surat", {
         method: "POST",
         body: dataToSend,
@@ -104,7 +103,6 @@ export default function DashboardLayout({ children }) {
         closeModal();
       } else {
         const err = await response.json().catch(() => ({}));
-        // PERUBAHAN DI SINI: JSON.stringify agar pesan error jelas, bukan object Object
         alert("Gagal menyimpan data ke database. Pesan server: " + JSON.stringify(err));
       }
     } catch (error) {
