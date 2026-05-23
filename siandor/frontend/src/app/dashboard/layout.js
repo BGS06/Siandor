@@ -77,7 +77,6 @@ export default function DashboardLayout({ children }) {
     }
     setIsSubmitting(true);
 
-    // Tentukan tipe berdasarkan pathname saat ini
     const tipe = pathname.includes("surat-keluar") ? "keluar" : "masuk";
 
     const dataToSend = new FormData();
@@ -93,23 +92,23 @@ export default function DashboardLayout({ children }) {
     if (filePendukung) dataToSend.append("file", filePendukung);
 
     try {
-      const response = await fetch("http://127.0.0.1:8001/api/surat", {
+      // PERUBAHAN DI SINI: URL diubah menjadi "/api/surat"
+      const response = await fetch("/api/surat", {
         method: "POST",
         body: dataToSend,
       });
 
       if (response.ok) {
-        // Backend mengembalikan data lengkap yang sudah tersimpan di DB
         const suratBaru = await response.json();
-        // Tambahkan baris baru ke tabel tanpa reload
         if (onNewSuratCallback) onNewSuratCallback(suratBaru);
         closeModal();
       } else {
         const err = await response.json().catch(() => ({}));
-        alert(`Gagal menyimpan: ${err.detail || "Periksa koneksi backend."}`);
+        // PERUBAHAN DI SINI: JSON.stringify agar pesan error jelas, bukan object Object
+        alert("Gagal menyimpan data ke database. Pesan server: " + JSON.stringify(err));
       }
     } catch (error) {
-      alert("Backend tidak dapat dihubungi. Pastikan uvicorn berjalan di port 8001.");
+      alert("Error jaringan atau server Vercel belum siap: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
