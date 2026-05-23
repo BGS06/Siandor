@@ -15,6 +15,7 @@ export default function SuratMasukPage() {
   useEffect(() => {
     if (registerNewSuratCallback) {
       registerNewSuratCallback((suratBaru) => {
+        // Ini kuncinya: menambahkan data baru ke daftar yang sudah ada
         setSuratData((prev) => [suratBaru, ...prev]);
       });
       return () => registerNewSuratCallback(null);

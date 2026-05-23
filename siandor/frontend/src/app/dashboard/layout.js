@@ -106,9 +106,6 @@ export default function DashboardLayout({ children }) {
         closeModal();
         
         // Jeda waktu agar database selesai menulis sebelum refresh
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
       } else {
         const err = await response.json().catch(() => ({}));
         alert("Gagal menyimpan data ke database. Pesan server: " + JSON.stringify(err));
