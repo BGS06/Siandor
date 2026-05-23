@@ -27,7 +27,7 @@ if os.path.exists(original_db) and not os.path.exists(tmp_db):
     shutil.copy2(original_db, tmp_db)
 
 # Hubungkan SQLAlchemy ke database yang ada di /tmp
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{tmp_db}"
+SQLALCHEMY_DATABASE_URL = f"sqlite:///./siandor.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
