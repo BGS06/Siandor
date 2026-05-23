@@ -1,7 +1,7 @@
-from fastapi import FastAPI, BackgroundTasks, File, UploadFile, Form, Depends
+from fastapi import FastAPI, BackgroundTasks, File, UploadFile, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse # <-- Tambahan baru untuk mengirim file ke browser
+from fastapi.responses import FileResponse
 import pandas as pd
 import datetime
 import os
@@ -14,20 +14,16 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 # ==========================================
 # TRIK VERCEL: PINDAHKAN FILE/FOLDER KE /tmp
 # ==========================================
-# 1. Setup Lokasi Folder Uploads
-UPLOAD_DIR = "/tmp/uploads"  # WAJIB menggunakan /tmp untuk Vercel
+UPLOAD_DIR = "/tmp/uploads"  
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-# 2. Setup Lokasi Database SQLite
-original_db = "siandor.db"     # File lokalmu (hanya bisa dibaca oleh Vercel)
-tmp_db = "/tmp/siandor.db"     # File duplikat yang diizinkan untuk ditulis
+original_db = "siandor.db"     
+tmp_db = "/tmp/siandor.db"     
 
-# Jika file db asli ada, copy ke /tmp agar siap digunakan
 if os.path.exists(original_db) and not os.path.exists(tmp_db):
     shutil.copy2(original_db, tmp_db)
 
-# Hubungkan SQLAlchemy ke database yang ada di /tmp
 SQLALCHEMY_DATABASE_URL = f"sqlite:///./siandor.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -47,7 +43,6 @@ class SuratDB(Base):
     disposisi = Column(String)
     file_path = Column(String, nullable=True)
 
-# Generate table jika belum ada
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -58,7 +53,7 @@ def get_db():
         db.close()
 
 # ==========================================
-# INISIALISASI FASTAPI
+# INISIALISASI FASTAPI & SETTING GOOGLE
 # ==========================================
 app = FastAPI(title="SIANDOR API", version="1.0")
 
@@ -66,7 +61,7 @@ app.mount("/uploads", StaticFiles(directory="/tmp/uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Mengizinkan semua origin untuk deploy Vercel
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -76,10 +71,66 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 SPREADSHEET_ID = '1Xz9g8VYe0rzPNdNUhnfH-sOXfv5fPuKMUhOP98dP9ls' 
 
 # ==========================================
-# ENDPOINT CRUD SURAT
+# FUNGSI SINKRONISASI MANUAL DARI TOMBOL LAPORAN
 # ==========================================
+@app.post("/api/surat/export/sheets")
+def export_ke_google_sheets_manual(tipe: str = None, db: Session = Depends(get_db)):
+    try:
+        semua_surat = db.query(SuratDB).all()
+        
+        # Filter data sesuai tombol yang diklik
+        if tipe == "masuk":
+            semua_surat = [s for s in semua_surat if "keluar" not in s.jenis_surat.lower()]
+        elif tipe == "keluar":
+            semua_surat = [s for s in semua_surat if "keluar" in s.jenis_surat.lower()]
+
+        # Panggil robot Google Cloud
+        creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+        client_gspread = gspread.authorize(creds)
+        sheet = client_gspread.open_by_key(SPREADSHEET_ID).sheet1
+        
+        # 1. Bersihkan seluruh isi sheet agar data tidak duplikat menumpuk kebawah
+        sheet.clear()
+        
+        # 2. Tulis ulang Header Tabel di baris pertama
+        header = ["NO AGENDA", "JENIS SURAT", "NAMA / ASAL", "PERIHAL", "NIK", "NO SURAT", "TANGGAL", "DISPOSISI", "STATUS"]
+        sheet.append_row(header)
+        
+        # 3. Tulis semua baris data baru secara massal jika ada datanya
+        if semua_surat:
+            kumpulan_baris = []
+            for s in semua_surat:
+                kumpulan_baris.append([
+                    s.no_agenda, s.jenis_surat, s.nama_pemohon, s.perihal,
+                    s.nik or "-", s.no_surat_asli or "-", s.tanggal, s.disposisi, s.status
+                ])
+            sheet.append_rows(kumpulan_baris)
+            
+        label_tipe = "Semua Surat" if not tipe else f"Surat {tipe.capitalize()}"
+        return {"status": "success", "pesan": f"Berhasil menulis {len(semua_surat)} data {label_tipe} ke Google Spreadsheet!"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# SINKRONISASI OTOMATIS SAAT INPUT DATA BARU
+# ==========================================
+def robot_kirim_ke_google_sheets(no_agenda, jenis_surat, nama_pemohon, perihal, nik, no_surat_asli, tanggal, disposisi, status):
+    print("🤖 Robot Google Cloud mengirim data tunggal...")
+    try:
+        creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+        client_gspread = gspread.authorize(creds)
+        sheet = client_gspread.open_by_key(SPREADSHEET_ID).sheet1
+        
+        baris_baru = [no_agenda, jenis_surat, nama_pemohon, perihal, nik or "-", no_surat_asli or "-", tanggal, disposisi, status]
+        sheet.append_row(baris_baru)
+        print("✅ Otomatis sinkron ke Google Spreadsheet!")
+    except Exception as e:
+        print(f"❌ Gagal otomatis sinkron: {e}")
+
 @app.post("/api/surat")
 async def tambah_surat(
+    background_tasks: BackgroundTasks,
     no_agenda: str = Form(...),
     jenis_surat: str = Form(...),
     nama_pemohon: str = Form(...),
@@ -97,42 +148,34 @@ async def tambah_surat(
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         filename = f"{timestamp}_{file.filename}"
         file_path = os.path.join(UPLOAD_DIR, filename)
-        
         with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
+            buffer.write(await file.read())
             
     db_surat = SuratDB(
-        no_agenda=no_agenda,
-        jenis_surat=jenis_surat,
-        nama_pemohon=nama_pemohon,
-        nik=nik,
-        perihal=perihal,
-        no_surat_asli=no_surat_asli,
-        tanggal=tanggal,
-        status=status,
-        disposisi=disposisi,
-        file_path=f"/uploads/{filename}" if file else None
+        no_agenda=no_agenda, jenis_surat=jenis_surat, nama_pemohon=nama_pemohon,
+        nik=nik, perihal=perihal, no_surat_asli=no_surat_asli, tanggal=tanggal,
+        status=status, disposisi=disposisi, file_path=f"/uploads/{filename}" if file else None
     )
     db.add(db_surat)
     db.commit()
     db.refresh(db_surat)
     
+    background_tasks.add_task(
+        robot_kirim_ke_google_sheets,
+        no_agenda, jenis_surat, nama_pemohon, perihal, nik, no_surat_asli, tanggal, disposisi, status
+    )
     return {"status": "success", "pesan": "Surat berhasil!"}
 
 @app.get("/api/surat")
 def ambil_semua_surat(db: Session = Depends(get_db)):
-    surat = db.query(SuratDB).order_by(desc(SuratDB.id)).all()
-    return surat
+    return db.query(SuratDB).order_by(desc(SuratDB.id)).all()
 
 @app.get("/api/statistik")
 def ambil_statistik(db: Session = Depends(get_db)):
     semua_surat = db.query(SuratDB).order_by(desc(SuratDB.id)).all()
-    
     total_surat = len(semua_surat)
     total_proses = sum(1 for s in semua_surat if s.status.lower() == "proses")
     total_selesai = sum(1 for s in semua_surat if s.status.lower() == "selesai")
-    
     total_keluar = sum(1 for s in semua_surat if "keluar" in s.jenis_surat.lower())
     total_masuk = total_surat - total_keluar
     
@@ -141,129 +184,10 @@ def ambil_statistik(db: Session = Depends(get_db)):
         tipe = "keluar" if "keluar" in s.jenis_surat.lower() else "masuk"
         b_color = "bg-hijau-pale text-hijau-tua" if s.status.lower() == "selesai" else "bg-emas-pale text-emas"
         terbaru.append({
-            "agenda": s.no_agenda,
-            "jenis": s.jenis_surat,
-            "asal": s.nama_pemohon,
-            "perihal": s.perihal,
-            "status": s.status,
-            "tipe": tipe,
-            "b": b_color
+            "agenda": s.no_agenda, "jenis": s.jenis_surat, "asal": s.nama_pemohon,
+            "perihal": s.perihal, "status": s.status, "tipe": tipe, "b": b_color
         })
-
     return {
-        "total_surat": total_surat,
-        "total_masuk": total_masuk,
-        "total_keluar": total_keluar,
-        "total_proses": total_proses,
-        "total_selesai": total_selesai,
-        "terbaru": terbaru
-    }
-
-# ==========================================
-# FUNGSI EXPORT EXCEL LANGSUNG (BARU)
-# ==========================================
-@app.get("/api/surat/export/excel")
-def export_excel_langsung(tipe: str = None, db: Session = Depends(get_db)):
-    semua_surat = db.query(SuratDB).all()
-    
-    if tipe == "masuk":
-        semua_surat = [s for s in semua_surat if "keluar" not in s.jenis_surat.lower()]
-    elif tipe == "keluar":
-        semua_surat = [s for s in semua_surat if "keluar" in s.jenis_surat.lower()]
-
-    if not semua_surat:
-        return {"pesan": "Tidak ada data untuk diekspor."}
-
-    data_arsip = []
-    for s in semua_surat:
-        data_arsip.append({
-            "NO AGENDA": s.no_agenda,
-            "JENIS SURAT": s.jenis_surat,
-            "NAMA / ASAL": s.nama_pemohon,
-            "PERIHAL": s.perihal,
-            "NIK": s.nik or "-",
-            "NO SURAT": s.no_surat_asli or "-",
-            "TANGGAL": s.tanggal,
-            "STATUS": s.status,
-            "DISPOSISI": s.disposisi
-        })
-
-    df = pd.DataFrame(data_arsip)
-    waktu_sekarang = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    folder_backup = "/tmp/backup_lokal"
-    
-    if not os.path.exists(folder_backup):
-        os.makedirs(folder_backup)
-        
-    nama_tipe = f"_{tipe.upper()}" if tipe else ""
-    nama_file = f"Backup_Arsip{nama_tipe}_{waktu_sekarang}.xlsx"
-    file_path = f"{folder_backup}/{nama_file}"
-    
-    # Generate Excel
-    df.to_excel(file_path, index=False)
-    
-    # Kirim file langsung ke browser pengguna
-    return FileResponse(
-        path=file_path, 
-        filename=nama_file, 
-        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-
-# ==========================================
-# FUNGSI BACKUP GOOGLE SHEETS (BACKGROUND)
-# ==========================================
-def proses_backup_otomatis(tipe: str = None):
-    print("Memulai proses backup Database ke Google Sheets...")
-    db = SessionLocal() 
-    try:
-        semua_surat = db.query(SuratDB).all()
-        
-        if tipe == "masuk":
-            semua_surat = [s for s in semua_surat if "keluar" not in s.jenis_surat.lower()]
-        elif tipe == "keluar":
-            semua_surat = [s for s in semua_surat if "keluar" in s.jenis_surat.lower()]
-
-        if not semua_surat:
-            print("Tidak ada data untuk dibackup.")
-            return
-
-        data_arsip = []
-        for s in semua_surat:
-            data_arsip.append({
-                "NO AGENDA": s.no_agenda,
-                "JENIS SURAT": s.jenis_surat,
-                "NAMA / ASAL": s.nama_pemohon,
-                "PERIHAL": s.perihal,
-                "NIK": s.nik or "-",
-                "NO SURAT": s.no_surat_asli or "-",
-                "TANGGAL": s.tanggal,
-                "DISPOSISI": s.disposisi
-            })
-
-        creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
-        client_gspread = gspread.authorize(creds)
-        sheet = client_gspread.open_by_key(SPREADSHEET_ID).sheet1
-        
-        for data in data_arsip:
-            baris_baru = [
-                data["NO AGENDA"], data["JENIS SURAT"], data["NAMA / ASAL"], 
-                data["PERIHAL"], data["NIK"], data["NO SURAT"], 
-                data["TANGGAL"], data["DISPOSISI"]
-            ]
-            sheet.append_row(baris_baru)
-        print("✅ LAPIS 2 SUKSES: Data tersinkronisasi ke Google Spreadsheet.")
-
-    except Exception as e:
-        print(f"❌ Error Proses Backup: {e}")
-    finally:
-        db.close() 
-        
-    print("BACKUP DATABASE SELESAI DENGAN AMAN!")
-
-@app.post("/api/backup")
-def jalankan_backup(background_tasks: BackgroundTasks, tipe: str = None):
-    background_tasks.add_task(proses_backup_otomatis, tipe)
-    return {
-        "status": "success",
-        "pesan": "Database berhasil diamankan ke Google Spreadsheet!"
+        "total_surat": total_surat, "total_masuk": total_masuk, "total_keluar": total_keluar,
+        "total_proses": total_proses, "total_selesai": total_selesai, "terbaru": terbaru
     }
