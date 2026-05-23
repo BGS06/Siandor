@@ -100,7 +100,7 @@ export default function DashboardLayout({ children }) {
 
     try {
       // Pastikan URL-nya menggunakan http://127.0.0.1:8001
-      const response = await fetch("http://127.0.0.1:8001/api/surat", {
+      const response = await fetch("/api/surat", {
         method: "POST",
         body: dataToSend,
       });

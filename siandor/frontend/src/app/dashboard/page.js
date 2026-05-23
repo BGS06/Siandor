@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const BACKEND = "http://127.0.0.1:8001";
+const BACKEND = "";
 
 export default function DashboardPage() {
   const [statistik, setStatistik] = useState(null);
