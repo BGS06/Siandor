@@ -12,6 +12,13 @@ from sqlalchemy import create_engine, Column, Integer, String, desc
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
 # ==========================================
+# TRIK PATH ABSOLUT UNTUK CREDENTIALS
+# ==========================================
+# Ini akan membuat Python selalu mencari credentials.json tepat di sebelah file index.py ini!
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CREDENTIALS_PATH = os.path.join(BASE_DIR, 'credentials.json')
+
+# ==========================================
 # TRIK VERCEL: PINDAHKAN FILE/FOLDER KE /tmp
 # ==========================================
 UPLOAD_DIR = "/tmp/uploads"  
@@ -78,25 +85,21 @@ def export_ke_google_sheets_manual(tipe: str = None, db: Session = Depends(get_d
     try:
         semua_surat = db.query(SuratDB).all()
         
-        # Filter data sesuai tombol yang diklik
         if tipe == "masuk":
             semua_surat = [s for s in semua_surat if "keluar" not in s.jenis_surat.lower()]
         elif tipe == "keluar":
             semua_surat = [s for s in semua_surat if "keluar" in s.jenis_surat.lower()]
 
-        # Panggil robot Google Cloud
-        creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+        # Menggunakan CREDENTIALS_PATH yang sudah dijamin akurat lokasinya
+        creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=SCOPES)
         client_gspread = gspread.authorize(creds)
         sheet = client_gspread.open_by_key(SPREADSHEET_ID).sheet1
         
-        # 1. Bersihkan seluruh isi sheet agar data tidak duplikat menumpuk kebawah
         sheet.clear()
         
-        # 2. Tulis ulang Header Tabel di baris pertama
         header = ["NO AGENDA", "JENIS SURAT", "NAMA / ASAL", "PERIHAL", "NIK", "NO SURAT", "TANGGAL", "DISPOSISI", "STATUS"]
         sheet.append_row(header)
         
-        # 3. Tulis semua baris data baru secara massal jika ada datanya
         if semua_surat:
             kumpulan_baris = []
             for s in semua_surat:
@@ -118,7 +121,8 @@ def export_ke_google_sheets_manual(tipe: str = None, db: Session = Depends(get_d
 def robot_kirim_ke_google_sheets(no_agenda, jenis_surat, nama_pemohon, perihal, nik, no_surat_asli, tanggal, disposisi, status):
     print("🤖 Robot Google Cloud mengirim data tunggal...")
     try:
-        creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
+        # Menggunakan CREDENTIALS_PATH yang sudah dijamin akurat lokasinya
+        creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=SCOPES)
         client_gspread = gspread.authorize(creds)
         sheet = client_gspread.open_by_key(SPREADSHEET_ID).sheet1
         
@@ -191,3 +195,51 @@ def ambil_statistik(db: Session = Depends(get_db)):
         "total_surat": total_surat, "total_masuk": total_masuk, "total_keluar": total_keluar,
         "total_proses": total_proses, "total_selesai": total_selesai, "terbaru": terbaru
     }
+
+# ==========================================
+# ENDPOINT EXPORT EXCEL LANGSUNG
+# ==========================================
+@app.get("/api/surat/export/excel")
+def export_excel_langsung(tipe: str = None, db: Session = Depends(get_db)):
+    semua_surat = db.query(SuratDB).all()
+    
+    if tipe == "masuk":
+        semua_surat = [s for s in semua_surat if "keluar" not in s.jenis_surat.lower()]
+    elif tipe == "keluar":
+        semua_surat = [s for s in semua_surat if "keluar" in s.jenis_surat.lower()]
+
+    if not semua_surat:
+        return {"pesan": "Tidak ada data untuk diekspor."}
+
+    data_arsip = []
+    for s in semua_surat:
+        data_arsip.append({
+            "NO AGENDA": s.no_agenda,
+            "JENIS SURAT": s.jenis_surat,
+            "NAMA / ASAL": s.nama_pemohon,
+            "PERIHAL": s.perihal,
+            "NIK": s.nik or "-",
+            "NO SURAT": s.no_surat_asli or "-",
+            "TANGGAL": s.tanggal,
+            "STATUS": s.status,
+            "DISPOSISI": s.disposisi
+        })
+
+    df = pd.DataFrame(data_arsip)
+    waktu_sekarang = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_backup = "/tmp/backup_lokal"
+    
+    if not os.path.exists(folder_backup):
+        os.makedirs(folder_backup)
+        
+    nama_tipe = f"_{tipe.upper()}" if tipe else ""
+    nama_file = f"Backup_Arsip{nama_tipe}_{waktu_sekarang}.xlsx"
+    file_path = f"{folder_backup}/{nama_file}"
+    
+    df.to_excel(file_path, index=False)
+    
+    return FileResponse(
+        path=file_path, 
+        filename=nama_file, 
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
