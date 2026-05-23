@@ -77,7 +77,7 @@ export default function DashboardLayout({ children }) {
     }
     setIsSubmitting(true);
 
-    const dateCode = new Date().toISOString().slice(0,10).replace(/-/g,"");
+    const dateCode = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const randomCode = Math.floor(1000 + Math.random() * 9000);
     const generatedAgenda = `AGD-${dateCode}-${randomCode}`;
 
@@ -91,7 +91,7 @@ export default function DashboardLayout({ children }) {
     dataToSend.append("tanggal", formData.tanggal);
     dataToSend.append("status", formData.status);
     dataToSend.append("disposisi", formData.disposisi);
-    
+
     if (filePendukung) dataToSend.append("file", filePendukung);
 
     try {
@@ -104,7 +104,11 @@ export default function DashboardLayout({ children }) {
         const suratBaru = await response.json();
         if (onNewSuratCallback) onNewSuratCallback(suratBaru);
         closeModal();
-        window.location.reload(); // Tombol ajaib untuk refresh otomatis
+        
+        // Jeda waktu agar database selesai menulis sebelum refresh
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
       } else {
         const err = await response.json().catch(() => ({}));
         alert("Gagal menyimpan data ke database. Pesan server: " + JSON.stringify(err));
