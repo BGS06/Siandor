@@ -3,8 +3,8 @@
 export default function DashboardAdminPage() {
   const stats = [
     { label: "Total Surat Tersimpan", value: "1.248", color: "hijau", bg: "hijau-pale" },
-    { label: "Surat Masuk (2024)", value: "87", color: "emas", bg: "emas-pale" },
-    { label: "Surat Keluar (2024)", value: "342", color: "biru", bg: "biru-muda" }
+    { label: "Surat Masuk (2026)", value: "87", color: "emas", bg: "emas-pale" },
+    { label: "Surat Keluar (2026)", value: "342", color: "biru", bg: "biru-muda" }
   ];
 
   const tableData = [

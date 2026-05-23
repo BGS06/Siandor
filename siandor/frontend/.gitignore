@@ -44,3 +44,22 @@ next-env.d.ts
 siandor/backend/credentials.json
 .env
 
+# =========================
+# BACKEND & DATABASE SIANDOR
+# =========================
+
+# Rahasia & Kredensial
+credentials.json
+**/credentials.json
+
+# Database & Penyimpanan File
+siandor.db
+uploads/
+backup_lokal/
+
+# Python & Virtual Environment
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/

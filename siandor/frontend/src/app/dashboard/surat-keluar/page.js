@@ -1,98 +1,173 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useContext } from "react";
+import { ModalContext } from "../layout";
+
+const BACKEND = "http://127.0.0.1:8001";
 
 export default function SuratKeluarPage() {
+  const [suratData, setSuratData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  // STATE UNTUK MODAL PREVIEW SURAT
   const [selectedSurat, setSelectedSurat] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const tableData = [
-    { agenda: "AG-003", jenis: "Keterangan", asal: "Budi Santoso", perihal: "Keterangan Domisili", nik: "3521xxx", no: "045/SK-DOM/2026", tgl: "09/05/2026", disp: "Kepala Desa", status: "Selesai", b: "bg-hijau-pale text-hijau-tua" },
-    { agenda: "AG-004", jenis: "Undangan", asal: "Kecamatan Paron", perihal: "Rapat Koordinasi", nik: "-", no: "046/UND/2026", tgl: "10/05/2026", disp: "Sekretaris", status: "Proses", b: "bg-emas-pale text-[#7A5400]" },
-    { agenda: "AG-005", jenis: "Pengantar", asal: "Siti Aminah", perihal: "Pengantar SKCK", nik: "3521yyy", no: "047/SKCK/2026", tgl: "11/05/2026", disp: "Kaur Umum", status: "Selesai", b: "bg-hijau-pale text-hijau-tua" },
-  ];
+  const { registerNewSuratCallback } = useContext(ModalContext);
 
-  // LOGIKA PENCARIAN REAL-TIME
-  const filteredData = tableData.filter((row) => 
-    row.agenda.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    row.asal.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    row.perihal.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    row.jenis.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    if (registerNewSuratCallback) {
+      registerNewSuratCallback((suratBaru) => {
+        setSuratData((prev) => [suratBaru, ...prev]);
+      });
+      return () => registerNewSuratCallback(null);
+    }
+  }, [registerNewSuratCallback]);
+
+  useEffect(() => { fetchSurat(); }, []);
+
+  const fetchSurat = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${BACKEND}/api/surat`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      
+      // Translasi format Database ke format Tabel Frontend
+      const formattedData = data.map(item => ({
+        id: item.id,
+        agenda: item.no_agenda,
+        jenis: item.jenis_surat,
+        asal: item.nama_pemohon,
+        perihal: item.perihal,
+        nik: item.nik || "-",
+        no: item.no_surat_asli || "-",
+        tgl: item.tanggal,
+        disp: item.disposisi,
+        status: item.status,
+        file_path: item.file_path,
+        tipe: item.jenis_surat.toLowerCase().includes("keluar") ? "keluar" : "masuk"
+      }));
+
+      // Filter khusus Surat Keluar
+      setSuratData(formattedData.filter(s => s.tipe === "keluar"));
+    } catch {
+      setSuratData([]); // Kosongkan tabel jika gagal
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredData = suratData.filter((row) =>
+    [row.agenda, row.asal, row.perihal, row.jenis].join(" ").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const renderPreview = (surat) => {
+    if (!surat.file_path) {
+      return (
+        <div className="w-full h-[180px] bg-latar rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-abu">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 text-border"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p className="font-bold text-hitam text-sm">Tidak Ada File</p>
+          <p className="text-xs mt-1 text-abu">Dokumen tidak diupload saat input</p>
+        </div>
+      );
+    }
+    const url = `${BACKEND}${surat.file_path}`;
+    const ext = surat.file_path.split(".").pop().toLowerCase();
+    if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
+      return (
+        <div className="w-full rounded-xl overflow-hidden border border-border bg-latar">
+          <img src={url} alt="Dokumen" className="w-full max-h-[280px] object-contain" />
+        </div>
+      );
+    }
+    if (ext === "pdf") {
+      return (
+        <div className="w-full h-[280px] rounded-xl overflow-hidden border border-border">
+          <iframe src={url} className="w-full h-full" title="Preview PDF" />
+        </div>
+      );
+    }
+    return (
+      <div className="w-full h-[100px] bg-latar rounded-xl border border-border flex flex-col items-center justify-center gap-2">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-abu"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p className="text-xs text-abu font-medium">{surat.file_path.split("/").pop()}</p>
+      </div>
+    );
+  };
+
+  const handleUnduh = (surat) => {
+    if (!surat.file_path) { alert("Tidak ada file untuk diunduh."); return; }
+    const link = document.createElement("a");
+    link.href = `${BACKEND}${surat.file_path}`;
+    link.setAttribute("download", surat.file_path.split("/").pop());
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm relative">
-      
-      {/* Search Bar Header */}
-      <div className="p-4 lg:p-5 border-b border-border flex items-center justify-between gap-4 bg-white">
+    <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
+
+      {/* Search */}
+      <div className="p-4 lg:p-5 border-b border-border flex items-center gap-4 bg-white">
         <div className="relative flex-1 max-w-md">
           <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-abu" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input 
-            type="text" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-latar border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:bg-white focus:border-hijau transition" 
-            placeholder="Cari No. Agenda, Nama, atau Perihal..." 
-          />
+          <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-latar border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:bg-white focus:border-hijau transition" placeholder="Cari No. Agenda, Nama, atau Perihal..." />
         </div>
+        <div className="text-xs text-abu font-medium shrink-0">{filteredData.length} surat</div>
       </div>
 
+      {/* Tabel */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[1200px]">
           <thead className="bg-latar border-b border-border">
             <tr>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">No Agenda</th>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">Jenis</th>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">Nama / Asal Surat</th>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">Perihal</th>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">NIK</th>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">No Surat</th>
-              {/* Warna biru pada Tanggal Kirim dihapus */}
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">Tanggal Kirim</th>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">Disposisi</th>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase">Status</th>
-              <th className="px-4 py-4 text-xs font-bold text-abu uppercase text-center">Aksi</th>
+              {["No Agenda","Jenis","Nama / Asal Surat","Perihal","NIK","No Surat","Tanggal Kirim","Disposisi","Status","Aksi"].map((h) => (
+                <th key={h} className="px-4 py-4 text-xs font-bold text-abu uppercase whitespace-nowrap">{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {filteredData.length > 0 ? filteredData.map((row, i) => (
-              <tr key={i} className="border-b border-border hover:bg-latar transition-colors">
-                <td className="px-4 py-3 text-sm font-bold text-hijau-tua">{row.agenda}</td>
+            {isLoading ? (
+              <tr><td colSpan="10" className="px-4 py-10 text-center text-sm text-abu">
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin text-hijau" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  Memuat data...
+                </div>
+              </td></tr>
+            ) : filteredData.length > 0 ? filteredData.map((row, i) => (
+              <tr key={`${row.id}-${i}`} className="border-b border-border hover:bg-latar transition-colors">
+                <td className="px-4 py-3 font-bold text-hijau-tua">{row.agenda}</td>
                 <td className="px-4 py-3 text-sm">{row.jenis}</td>
-                <td className="px-4 py-3 text-sm">{row.asal}</td>
+                <td className="px-4 py-3 text-sm font-medium">{row.asal}</td>
                 <td className="px-4 py-3 text-sm">{row.perihal}</td>
                 <td className="px-4 py-3 text-sm">{row.nik}</td>
                 <td className="px-4 py-3 text-sm">{row.no}</td>
-                <td className="px-4 py-3 text-sm font-semibold">{row.tgl}</td>
+                <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap">{row.tgl}</td>
                 <td className="px-4 py-3 text-sm">{row.disp}</td>
-                <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${row.b}`}>{row.status}</span></td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${row.b || (row.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]")}`}>
+                    {row.status}
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-center">
-                  {/* Fungsi onClick ditambahkan untuk membuka Modal */}
-                  <button 
-                    onClick={() => setSelectedSurat(row)} 
-                    className="text-biru text-sm font-bold hover:underline transition cursor-pointer"
-                  >
-                    Lihat
-                  </button>
+                  <button onClick={() => setSelectedSurat(row)} className="text-biru text-sm font-bold hover:underline cursor-pointer">Lihat</button>
                 </td>
               </tr>
             )) : (
-              <tr>
-                <td colSpan="10" className="px-4 py-10 text-center text-sm font-medium text-abu">
-                  Tidak ada surat keluar yang cocok dengan pencarian "{searchTerm}".
-                </td>
-              </tr>
+              <tr><td colSpan="10" className="px-4 py-10 text-center text-sm font-medium text-abu">
+                {searchTerm ? `Tidak ada surat yang cocok dengan "${searchTerm}".` : "Belum ada data surat keluar."}
+              </td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* MODAL PREVIEW DOKUMEN */}
+      {/* MODAL DETAIL */}
       {selectedSurat && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-latar rounded-t-2xl">
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-latar rounded-t-2xl shrink-0">
               <div>
                 <h2 className="text-base font-bold text-hitam">Detail Dokumen</h2>
                 <p className="text-xs text-hijau-tua font-bold mt-0.5">{selectedSurat.agenda}</p>
@@ -101,41 +176,42 @@ export default function SuratKeluarPage() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            
-            <div className="p-5">
-              <div className="w-full h-[220px] bg-abu-muda rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-abu p-4">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 text-border"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <p className="font-bold text-hitam text-sm">Preview Dokumen</p>
-                <p className="text-xs mt-1 text-center line-clamp-2">Surat Keluar - {selectedSurat.jenis}.pdf</p>
-              </div>
 
-              {/* Rincian Tambahan */}
-              <div className="mt-4 space-y-2 bg-latar p-3 rounded-xl border border-border">
-                 <div className="flex justify-between text-sm">
-                    <span className="text-abu font-medium">Tujuan:</span>
-                    <span className="text-hitam font-bold text-right">{selectedSurat.asal}</span>
-                 </div>
-                 <div className="flex justify-between text-sm">
-                    <span className="text-abu font-medium">Perihal:</span>
-                    <span className="text-hitam font-bold text-right">{selectedSurat.perihal}</span>
-                 </div>
-                 <div className="flex justify-between text-sm">
-                    <span className="text-abu font-medium">No. Surat:</span>
-                    <span className="text-hitam font-bold text-right">{selectedSurat.no}</span>
-                 </div>
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {renderPreview(selectedSurat)}
+              <div className="mt-4 space-y-2.5 bg-latar p-4 rounded-xl border border-border text-sm">
+                {[
+                  ["Tujuan", selectedSurat.asal],
+                  ["Perihal", selectedSurat.perihal],
+                  ["No. Surat", selectedSurat.no],
+                  ["Tanggal", selectedSurat.tgl],
+                  ["Disposisi", selectedSurat.disp],
+                ].map(([label, val]) => (
+                  <div key={label} className="flex justify-between gap-4">
+                    <span className="text-abu font-medium shrink-0">{label}:</span>
+                    <span className="text-hitam font-bold text-right">{val}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center gap-4">
+                  <span className="text-abu font-medium shrink-0">Status:</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedSurat.b || (selectedSurat.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]")}`}>
+                    {selectedSurat.status}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="px-5 py-4 border-t border-border flex justify-end gap-3 bg-latar rounded-b-2xl">
+            <div className="px-5 py-4 border-t border-border flex justify-end gap-3 bg-latar rounded-b-2xl shrink-0">
               <button onClick={() => setSelectedSurat(null)} className="px-4 py-2 border-2 border-border text-hitam rounded-lg font-bold text-xs hover:bg-white transition cursor-pointer">Tutup</button>
-              <button onClick={() => {alert("Mencetak dokumen..."); window.print();}} className="px-4 py-2 bg-white border border-border text-hitam rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-latar shadow-sm transition cursor-pointer">
-                Cetak
-              </button>
-              <button onClick={() => alert("Mengunduh PDF...")} className="px-4 py-2 bg-hijau text-white rounded-lg font-bold text-xs flex items-center gap-2 hover:bg-hijau-tua shadow-md transition cursor-pointer">
+              <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-border text-hitam rounded-lg font-bold text-xs hover:bg-latar shadow-sm transition cursor-pointer">Cetak</button>
+              <button
+                onClick={() => handleUnduh(selectedSurat)}
+                disabled={!selectedSurat.file_path}
+                className="px-4 py-2 bg-hijau text-white rounded-lg font-bold text-xs hover:bg-hijau-tua shadow-md transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 Unduh PDF
               </button>
             </div>
-
           </div>
         </div>
       )}
