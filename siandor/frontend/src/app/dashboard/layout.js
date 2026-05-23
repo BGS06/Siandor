@@ -77,16 +77,12 @@ export default function DashboardLayout({ children }) {
     }
     setIsSubmitting(true);
 
-    const tipe = pathname.includes("surat-keluar") ? "keluar" : "masuk";
-
-    // --- TAMBAHAN BARU: Generate Nomor Agenda Otomatis ---
-    const dateCode = new Date().toISOString().slice(0,10).replace(/-/g,""); // hasil: 20260523
-    const randomCode = Math.floor(1000 + Math.random() * 9000); // hasil: 4 angka acak
+    const dateCode = new Date().toISOString().slice(0,10).replace(/-/g,"");
+    const randomCode = Math.floor(1000 + Math.random() * 9000);
     const generatedAgenda = `AGD-${dateCode}-${randomCode}`;
-    // -----------------------------------------------------
 
     const dataToSend = new FormData();
-    dataToSend.append("no_agenda", generatedAgenda); // <-- SEKARANG SUDAH ADA!
+    dataToSend.append("no_agenda", generatedAgenda);
     dataToSend.append("jenis_surat", formData.jenis_surat);
     dataToSend.append("nama_pemohon", formData.nama_pemohon);
     dataToSend.append("nik", formData.nik);
@@ -99,7 +95,6 @@ export default function DashboardLayout({ children }) {
     if (filePendukung) dataToSend.append("file", filePendukung);
 
     try {
-      // Pastikan URL-nya menggunakan http://127.0.0.1:8001
       const response = await fetch("https://dfa4-2001-448a-c030-ac9-102f-e0a3-db8d-6362.ngrok-free.app/api/surat", {
         method: "POST",
         body: dataToSend,
@@ -109,6 +104,7 @@ export default function DashboardLayout({ children }) {
         const suratBaru = await response.json();
         if (onNewSuratCallback) onNewSuratCallback(suratBaru);
         closeModal();
+        window.location.reload(); // Tombol ajaib untuk refresh otomatis
       } else {
         const err = await response.json().catch(() => ({}));
         alert("Gagal menyimpan data ke database. Pesan server: " + JSON.stringify(err));
@@ -119,7 +115,6 @@ export default function DashboardLayout({ children }) {
       setIsSubmitting(false);
     }
   };
-
   const handleDrop = (e) => {
     e.preventDefault(); setIsDragging(false);
     if (e.dataTransfer.files?.[0]) setFilePendukung(e.dataTransfer.files[0]);
