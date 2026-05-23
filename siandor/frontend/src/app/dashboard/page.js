@@ -1,16 +1,35 @@
 "use client";
+import { useState, useEffect } from "react";
+
+const BACKEND = "http://127.0.0.1:8001";
 
 export default function DashboardAdminPage() {
-  const stats = [
-    { label: "Total Surat Tersimpan", value: "1.248", color: "hijau", bg: "hijau-pale" },
-    { label: "Surat Masuk (2026)", value: "87", color: "emas", bg: "emas-pale" },
-    { label: "Surat Keluar (2026)", value: "342", color: "biru", bg: "biru-muda" }
-  ];
+  const [statistik, setStatistik] = useState({
+    total_surat: 0,
+    total_masuk: 0,
+    total_keluar: 0,
+    terbaru: []
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const tableData = [
-    { noAg: "AG-001/2026", jenis: "Domisili", nama: "Budi Santoso", perihal: "Pengantar Domisili", status: "Selesai", badge: "bg-hijau-pale text-hijau-tua" },
-    { noAg: "AG-002/2026", jenis: "SKTM", nama: "Siti Aminah", perihal: "Keterangan Tidak Mampu", status: "Proses", badge: "bg-emas-pale text-[#7A5400]" },
-  ];
+  useEffect(() => {
+    fetchStatistik();
+  }, []);
+
+  const fetchStatistik = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${BACKEND}/api/statistik`);
+      if (res.ok) {
+        const data = await res.json();
+        setStatistik(data);
+      }
+    } catch (err) {
+      console.error("Gagal memuat statistik", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div>
@@ -19,18 +38,27 @@ export default function DashboardAdminPage() {
         <p className="text-sm text-abu mt-1 font-medium">Ringkasan cepat arsip Desa Ngrandulor.</p>
       </div>
 
+      {/* Kartu Statistik Dinamis */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-        {stats.map((item, i) => (
-          <div key={i} className="bg-white border border-border rounded-2xl p-6 flex flex-col gap-3 shadow-sm">
-            <div className="text-[32px] font-black text-hitam leading-none tracking-tighter">{item.value}</div>
-            <div className="text-[13px] text-abu font-semibold">{item.label}</div>
-          </div>
-        ))}
+        <div className="bg-white border border-border rounded-2xl p-6 flex flex-col gap-3 shadow-sm">
+          <div className="text-[32px] font-black text-hitam leading-none tracking-tighter">{isLoading ? "..." : statistik.total_surat}</div>
+          <div className="text-[13px] text-abu font-semibold">Total Surat Tersimpan</div>
+        </div>
+        <div className="bg-white border border-border rounded-2xl p-6 flex flex-col gap-3 shadow-sm">
+          <div className="text-[32px] font-black text-hitam leading-none tracking-tighter">{isLoading ? "..." : statistik.total_masuk}</div>
+          <div className="text-[13px] text-abu font-semibold">Surat Masuk (2026)</div>
+        </div>
+        <div className="bg-white border border-border rounded-2xl p-6 flex flex-col gap-3 shadow-sm">
+          <div className="text-[32px] font-black text-hitam leading-none tracking-tighter">{isLoading ? "..." : statistik.total_keluar}</div>
+          <div className="text-[13px] text-abu font-semibold">Surat Keluar (2026)</div>
+        </div>
       </div>
 
+      {/* Tabel Surat Terbaru Dinamis */}
       <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
         <div className="px-6 py-5 border-b border-border flex items-center justify-between">
           <div className="text-base font-bold text-hitam">Surat Terbaru</div>
+          <button onClick={fetchStatistik} className="text-xs font-bold text-hijau hover:underline cursor-pointer">Refresh</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[700px]">
@@ -43,14 +71,24 @@ export default function DashboardAdminPage() {
               </tr>
             </thead>
             <tbody>
-              {tableData.map((row, i) => (
-                <tr key={i} className="border-b border-border">
-                  <td className="px-6 py-4 text-sm font-bold text-hijau-tua">{row.noAg}</td>
-                  <td className="px-6 py-4 text-sm text-hitam">{row.nama}</td>
-                  <td className="px-6 py-4 text-sm text-hitam">{row.perihal}</td>
-                  <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-bold ${row.badge}`}>{row.status}</span></td>
-                </tr>
-              ))}
+              {isLoading ? (
+                <tr><td colSpan="4" className="px-6 py-4 text-center text-sm text-abu">Memuat data...</td></tr>
+              ) : statistik.terbaru.length > 0 ? (
+                statistik.terbaru.map((row, i) => (
+                  <tr key={i} className="border-b border-border">
+                    <td className="px-6 py-4 text-sm font-bold text-hijau-tua">{row.agenda}</td>
+                    <td className="px-6 py-4 text-sm text-hitam">{row.asal}</td>
+                    <td className="px-6 py-4 text-sm text-hitam">{row.perihal}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${row.b}`}>
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td colSpan="4" className="px-6 py-4 text-center text-sm text-abu">Belum ada surat terbaru.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
