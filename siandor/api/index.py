@@ -4,14 +4,30 @@ from fastapi.staticfiles import StaticFiles
 import pandas as pd
 import datetime
 import os
+import shutil
 import gspread
 from google.oauth2.service_account import Credentials
-
-# --- 1. SETUP DATABASE SQLITE ---
 from sqlalchemy import create_engine, Column, Integer, String, desc
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./siandor.db"
+# ==========================================
+# TRIK VERCEL: PINDAHKAN FILE/FOLDER KE /tmp
+# ==========================================
+# 1. Setup Lokasi Folder Uploads
+UPLOAD_DIR = "/tmp/uploads"  # WAJIB menggunakan /tmp untuk Vercel
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+# 2. Setup Lokasi Database SQLite
+original_db = "siandor.db"     # File lokalmu (hanya bisa dibaca oleh Vercel)
+tmp_db = "/tmp/siandor.db"     # File duplikat yang diizinkan untuk ditulis
+
+# Jika file db asli ada, copy ke /tmp agar siap digunakan
+if os.path.exists(original_db) and not os.path.exists(tmp_db):
+    shutil.copy2(original_db, tmp_db)
+
+# Hubungkan SQLAlchemy ke database yang ada di /tmp
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{tmp_db}"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -30,6 +46,7 @@ class SuratDB(Base):
     disposisi = Column(String)
     file_path = Column(String, nullable=True)
 
+# Generate table jika belum ada
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -39,28 +56,27 @@ def get_db():
     finally:
         db.close()
 
+# ==========================================
+# INISIALISASI FASTAPI
+# ==========================================
 app = FastAPI(title="SIANDOR API", version="1.0")
 
-# --- 2. SETUP FOLDER UPLOAD ---
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
-
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", StaticFiles(directory="/tmp/uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"], 
+    allow_origins=["*"], # Mengizinkan semua origin untuk deploy Vercel
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-SPREADSHEET_ID = '1Xz9g8VYe0rzPNdNUhnfH-sOXfv5fPuKMUhOP98dP9ls' # Pastikan ID Spreadsheet-mu tetap di sini
+SPREADSHEET_ID = '1Xz9g8VYe0rzPNdNUhnfH-sOXfv5fPuKMUhOP98dP9ls' 
 
-# --- 3. ENDPOINT CRUD SURAT ---
-
+# ==========================================
+# ENDPOINT CRUD SURAT
+# ==========================================
 @app.post("/api/surat")
 async def tambah_surat(
     no_agenda: str = Form(...),
@@ -101,15 +117,13 @@ async def tambah_surat(
     db.commit()
     db.refresh(db_surat)
     
-    return {"status": "success", "pesan": "Surat berhasil disimpan ke database asli!"}
+    return {"status": "success", "pesan": "Surat berhasil disimpan ke Vercel /tmp!"}
 
-# API BARU: Mengambil seluruh data surat untuk ditampilkan di Frontend
 @app.get("/api/surat")
 def ambil_semua_surat(db: Session = Depends(get_db)):
     surat = db.query(SuratDB).order_by(desc(SuratDB.id)).all()
     return surat
 
-# API BARU: Mengambil statistik untuk halaman Laporan dan Dashboard
 @app.get("/api/statistik")
 def ambil_statistik(db: Session = Depends(get_db)):
     semua_surat = db.query(SuratDB).order_by(desc(SuratDB.id)).all()
@@ -118,11 +132,9 @@ def ambil_statistik(db: Session = Depends(get_db)):
     total_proses = sum(1 for s in semua_surat if s.status.lower() == "proses")
     total_selesai = sum(1 for s in semua_surat if s.status.lower() == "selesai")
     
-    # Asumsi: Jika nama jenis surat mengandung kata "keluar", maka itu Surat Keluar
     total_keluar = sum(1 for s in semua_surat if "keluar" in s.jenis_surat.lower())
     total_masuk = total_surat - total_keluar
     
-    # Mengambil 5 surat terbaru untuk tabel kecil di Dashboard/Laporan
     terbaru = []
     for s in semua_surat[:5]:
         tipe = "keluar" if "keluar" in s.jenis_surat.lower() else "masuk"
@@ -146,14 +158,15 @@ def ambil_statistik(db: Session = Depends(get_db)):
         "terbaru": terbaru
     }
 
-# --- 4. FUNGSI BACKUP (SEKARANG TERHUBUNG KE DATABASE ASLI) ---
+# ==========================================
+# FUNGSI BACKUP
+# ==========================================
 def proses_backup_otomatis(tipe: str = None):
     print("Memulai proses backup Database...")
-    db = SessionLocal() # Buka koneksi database khusus untuk task latar belakang
+    db = SessionLocal() 
     try:
         semua_surat = db.query(SuratDB).all()
         
-        # Filter jika tombol yang ditekan adalah "Backup Surat Masuk" / "Keluar"
         if tipe == "masuk":
             semua_surat = [s for s in semua_surat if "keluar" not in s.jenis_surat.lower()]
         elif tipe == "keluar":
@@ -163,7 +176,6 @@ def proses_backup_otomatis(tipe: str = None):
             print("Tidak ada data untuk dibackup.")
             return
 
-        # Mengubah data dari Database menjadi format yang siap diekspor ke Excel/Sheets
         data_arsip = []
         for s in semua_surat:
             data_arsip.append({
@@ -179,17 +191,17 @@ def proses_backup_otomatis(tipe: str = None):
 
         df = pd.DataFrame(data_arsip)
         waktu_sekarang = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        folder_backup = "backup_lokal"
+        
+        # 3. Ubah Folder Backup Lokal ke /tmp
+        folder_backup = "/tmp/backup_lokal"
         nama_tipe = f"_{tipe.upper()}" if tipe else ""
         nama_file_excel = f"{folder_backup}/Backup_Arsip{nama_tipe}_{waktu_sekarang}.xlsx"
         
-        # LAPIS 1: EXCEL LOKAL
         if not os.path.exists(folder_backup):
             os.makedirs(folder_backup)
         df.to_excel(nama_file_excel, index=False)
         print(f"✅ LAPIS 1 SUKSES: Excel tersimpan di {nama_file_excel}")
 
-        # LAPIS 2: GOOGLE SPREADSHEET
         creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
         client_gspread = gspread.authorize(creds)
         sheet = client_gspread.open_by_key(SPREADSHEET_ID).sheet1
@@ -206,7 +218,7 @@ def proses_backup_otomatis(tipe: str = None):
     except Exception as e:
         print(f"❌ Error Proses Backup: {e}")
     finally:
-        db.close() # Tutup database setelah selesai
+        db.close() 
         
     print("BACKUP DATABASE SELESAI DENGAN AMAN!")
 
@@ -215,5 +227,5 @@ def jalankan_backup(background_tasks: BackgroundTasks, tipe: str = None):
     background_tasks.add_task(proses_backup_otomatis, tipe)
     return {
         "status": "success",
-        "pesan": "Database asli berhasil diamankan ke Excel & Google Spreadsheet!"
+        "pesan": "Database berhasil diamankan ke Excel & Google Spreadsheet!"
     }
