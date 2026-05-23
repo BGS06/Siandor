@@ -1,6 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks, File, UploadFile, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse # <-- Tambahan baru untuk mengirim file ke browser
 import pandas as pd
 import datetime
 import os
@@ -159,10 +160,60 @@ def ambil_statistik(db: Session = Depends(get_db)):
     }
 
 # ==========================================
-# FUNGSI BACKUP
+# FUNGSI EXPORT EXCEL LANGSUNG (BARU)
+# ==========================================
+@app.get("/api/surat/export/excel")
+def export_excel_langsung(tipe: str = None, db: Session = Depends(get_db)):
+    semua_surat = db.query(SuratDB).all()
+    
+    if tipe == "masuk":
+        semua_surat = [s for s in semua_surat if "keluar" not in s.jenis_surat.lower()]
+    elif tipe == "keluar":
+        semua_surat = [s for s in semua_surat if "keluar" in s.jenis_surat.lower()]
+
+    if not semua_surat:
+        return {"pesan": "Tidak ada data untuk diekspor."}
+
+    data_arsip = []
+    for s in semua_surat:
+        data_arsip.append({
+            "NO AGENDA": s.no_agenda,
+            "JENIS SURAT": s.jenis_surat,
+            "NAMA / ASAL": s.nama_pemohon,
+            "PERIHAL": s.perihal,
+            "NIK": s.nik or "-",
+            "NO SURAT": s.no_surat_asli or "-",
+            "TANGGAL": s.tanggal,
+            "STATUS": s.status,
+            "DISPOSISI": s.disposisi
+        })
+
+    df = pd.DataFrame(data_arsip)
+    waktu_sekarang = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_backup = "/tmp/backup_lokal"
+    
+    if not os.path.exists(folder_backup):
+        os.makedirs(folder_backup)
+        
+    nama_tipe = f"_{tipe.upper()}" if tipe else ""
+    nama_file = f"Backup_Arsip{nama_tipe}_{waktu_sekarang}.xlsx"
+    file_path = f"{folder_backup}/{nama_file}"
+    
+    # Generate Excel
+    df.to_excel(file_path, index=False)
+    
+    # Kirim file langsung ke browser pengguna
+    return FileResponse(
+        path=file_path, 
+        filename=nama_file, 
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+# ==========================================
+# FUNGSI BACKUP GOOGLE SHEETS (BACKGROUND)
 # ==========================================
 def proses_backup_otomatis(tipe: str = None):
-    print("Memulai proses backup Database...")
+    print("Memulai proses backup Database ke Google Sheets...")
     db = SessionLocal() 
     try:
         semua_surat = db.query(SuratDB).all()
@@ -189,19 +240,6 @@ def proses_backup_otomatis(tipe: str = None):
                 "DISPOSISI": s.disposisi
             })
 
-        df = pd.DataFrame(data_arsip)
-        waktu_sekarang = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # 3. Ubah Folder Backup Lokal ke /tmp
-        folder_backup = "/tmp/backup_lokal"
-        nama_tipe = f"_{tipe.upper()}" if tipe else ""
-        nama_file_excel = f"{folder_backup}/Backup_Arsip{nama_tipe}_{waktu_sekarang}.xlsx"
-        
-        if not os.path.exists(folder_backup):
-            os.makedirs(folder_backup)
-        df.to_excel(nama_file_excel, index=False)
-        print(f"✅ LAPIS 1 SUKSES: Excel tersimpan di {nama_file_excel}")
-
         creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
         client_gspread = gspread.authorize(creds)
         sheet = client_gspread.open_by_key(SPREADSHEET_ID).sheet1
@@ -227,5 +265,5 @@ def jalankan_backup(background_tasks: BackgroundTasks, tipe: str = None):
     background_tasks.add_task(proses_backup_otomatis, tipe)
     return {
         "status": "success",
-        "pesan": "Database berhasil diamankan ke Excel & Google Spreadsheet!"
+        "pesan": "Database berhasil diamankan ke Google Spreadsheet!"
     }
