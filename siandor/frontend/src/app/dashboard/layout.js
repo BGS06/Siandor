@@ -79,7 +79,14 @@ export default function DashboardLayout({ children }) {
 
     const tipe = pathname.includes("surat-keluar") ? "keluar" : "masuk";
 
+    // --- TAMBAHAN BARU: Generate Nomor Agenda Otomatis ---
+    const dateCode = new Date().toISOString().slice(0,10).replace(/-/g,""); // hasil: 20260523
+    const randomCode = Math.floor(1000 + Math.random() * 9000); // hasil: 4 angka acak
+    const generatedAgenda = `AGD-${dateCode}-${randomCode}`;
+    // -----------------------------------------------------
+
     const dataToSend = new FormData();
+    dataToSend.append("no_agenda", generatedAgenda); // <-- SEKARANG SUDAH ADA!
     dataToSend.append("jenis_surat", formData.jenis_surat);
     dataToSend.append("nama_pemohon", formData.nama_pemohon);
     dataToSend.append("nik", formData.nik);
@@ -88,11 +95,12 @@ export default function DashboardLayout({ children }) {
     dataToSend.append("tanggal", formData.tanggal);
     dataToSend.append("status", formData.status);
     dataToSend.append("disposisi", formData.disposisi);
-    dataToSend.append("tipe", tipe);
+    
     if (filePendukung) dataToSend.append("file", filePendukung);
 
     try {
-      const response = await fetch("/api/surat", {
+      // Pastikan URL-nya menggunakan http://127.0.0.1:8001
+      const response = await fetch("http://127.0.0.1:8001/api/surat", {
         method: "POST",
         body: dataToSend,
       });
@@ -106,7 +114,7 @@ export default function DashboardLayout({ children }) {
         alert("Gagal menyimpan data ke database. Pesan server: " + JSON.stringify(err));
       }
     } catch (error) {
-      alert("Error jaringan atau server Vercel belum siap: " + error.message);
+      alert("Error jaringan: " + error.message);
     } finally {
       setIsSubmitting(false);
     }

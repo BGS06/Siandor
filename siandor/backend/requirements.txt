@@ -1,8 +1,8 @@
 fastapi
 uvicorn
 sqlalchemy
-python-multipart
 pandas
+openpyxl
 gspread
 google-auth
-openpyxl
+python-multipart
