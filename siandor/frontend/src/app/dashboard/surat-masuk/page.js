@@ -15,7 +15,6 @@ export default function SuratMasukPage() {
   useEffect(() => {
     if (registerNewSuratCallback) {
       registerNewSuratCallback(() => {
-        // Solusi instan: abaikan data mentah POST, langsung refetch terstruktur dari database
         fetchSurat();
       });
       return () => registerNewSuratCallback(null);
@@ -29,7 +28,12 @@ export default function SuratMasukPage() {
   const fetchSurat = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND}/api/surat`, { cache: "no-store" });
+      const res = await fetch(`${BACKEND}/api/surat`, { 
+        cache: "no-store",
+        headers: {
+          "ngrok-skip-browser-warning": "69420"
+        }
+      });
       if (!res.ok) throw new Error();
       const data = await res.json();
       

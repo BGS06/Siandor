@@ -14,7 +14,12 @@ export default function DashboardPage() {
   const fetchStatistik = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND}/api/statistik`, { cache: "no-store" }); 
+      const res = await fetch(`${BACKEND}/api/statistik`, { 
+        cache: "no-store",
+        headers: {
+          "ngrok-skip-browser-warning": "69420"
+        }
+      }); 
       if (res.ok) {
         const data = await res.json();
         setStatistik(data);
