@@ -59,8 +59,36 @@ export default function PenyimpananArsipPage() {
   const suratKeluar = semuaArsip.filter(s => s.tipe === "keluar").length;
   const adaFile = semuaArsip.filter(s => s.file_path).length;
 
-  const handleBackupExcel = () => {
-    window.location.href = `${BACKEND}/api/surat/export/excel`;
+  const handleBackupExcel = async () => {
+    try {
+      // 1. Kita ambil file pakai fetch agar bisa menyusupkan kode rahasia Ngrok
+      const res = await fetch(`${BACKEND}/api/surat/export/excel`, {
+        method: "GET",
+        headers: {
+          "ngrok-skip-browser-warning": "69420" // Kunci agar Ngrok tidak mencegat
+        }
+      });
+
+      if (!res.ok) throw new Error("Gagal mengunduh file");
+
+      // 2. Ubah data yang ditangkap menjadi bentuk file (Blob)
+      const blob = await res.blob();
+
+      // 3. Buat link download "gaib" dan paksa browser mengkliknya
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Backup_Arsip_Desa_${new Date().toISOString().slice(0,10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+
+      // 4. Bersihkan memori
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      alert("❌ Gagal menghubungi backend untuk backup: " + error.message);
+    }
   };
 
   return (
