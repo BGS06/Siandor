@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const BACKEND = "https://9a6d-2001-448a-c030-ac9-61b1-d317-ad55-8a3c.ngrok-free.app";
+const BACKEND = "https://dfa4-2001-448a-c030-ac9-102f-e0a3-db8d-6362.ngrok-free.app";
 
 export default function DashboardPage() {
   const [statistik, setStatistik] = useState(null);

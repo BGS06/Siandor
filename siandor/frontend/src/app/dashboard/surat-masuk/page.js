@@ -2,7 +2,7 @@
 import { useState, useEffect, useContext } from "react";
 import { ModalContext } from "../layout";
 
-const BACKEND = "https://9a6d-2001-448a-c030-ac9-61b1-d317-ad55-8a3c.ngrok-free.app";
+const BACKEND = "https://dfa4-2001-448a-c030-ac9-102f-e0a3-db8d-6362.ngrok-free.app";
 
 export default function SuratMasukPage() {
   const [suratData, setSuratData] = useState([]);
@@ -31,6 +31,7 @@ export default function SuratMasukPage() {
       const res = await fetch(`${BACKEND}/api/surat`);
       if (!res.ok) throw new Error();
       const data = await res.json();
+      console.log("Raw data dari backend:", data);
       
       const formattedData = data.map(item => ({
         id: item.id,
@@ -48,7 +49,7 @@ export default function SuratMasukPage() {
       }));
 
       // Filter khusus Surat Masuk
-      setSuratData(formattedData.filter(s => s.tipe === "masuk"));
+      setSuratData(formattedData);
     } catch {
       setSuratData([]); 
     } finally {
