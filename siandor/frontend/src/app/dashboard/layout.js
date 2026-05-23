@@ -100,7 +100,7 @@ export default function DashboardLayout({ children }) {
 
     try {
       // Pastikan URL-nya menggunakan http://127.0.0.1:8001
-      const response = await fetch("/api/surat", {
+      const response = await fetch("https://9a6d-2001-448a-c030-ac9-61b1-d317-ad55-8a3c.ngrok-free.app", {
         method: "POST",
         body: dataToSend,
       });

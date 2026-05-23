@@ -2,7 +2,7 @@
 import { useState, useEffect, useContext } from "react";
 import { ModalContext } from "../layout";
 
-const BACKEND = "";
+const BACKEND = "https://9a6d-2001-448a-c030-ac9-61b1-d317-ad55-8a3c.ngrok-free.app";
 
 export default function SuratKeluarPage() {
   const [suratData, setSuratData] = useState([]);

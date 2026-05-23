@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const BACKEND = "http://127.0.0.1:8001";
+const BACKEND = "https://9a6d-2001-448a-c030-ac9-61b1-d317-ad55-8a3c.ngrok-free.app";
 
 export default function PenyimpananArsipPage() {
   const [suratData, setSuratData] = useState([]);
