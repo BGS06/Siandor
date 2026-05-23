@@ -117,7 +117,7 @@ async def tambah_surat(
     db.commit()
     db.refresh(db_surat)
     
-    return {"status": "success", "pesan": "Surat berhasil disimpan ke Vercel /tmp!"}
+    return {"status": "success", "pesan": "Surat berhasil!"}
 
 @app.get("/api/surat")
 def ambil_semua_surat(db: Session = Depends(get_db)):

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const BACKEND = "https://9a6d-2001-448a-c030-ac9-61b1-d317-ad55-8a3c.ngrok-free.app/api/surat";
+const BACKEND = "https://9a6d-2001-448a-c030-ac9-61b1-d317-ad55-8a3c.ngrok-free.app";
 
 export default function DashboardPage() {
   const [statistik, setStatistik] = useState(null);
@@ -14,7 +14,8 @@ export default function DashboardPage() {
   const fetchStatistik = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND}/api/statistik`);
+      // Pastikan URL-nya menjadi: ...ngrok-free.app/api/statistik
+      const res = await fetch(`${BACKEND}/api/statistik`); 
       if (res.ok) {
         const data = await res.json();
         setStatistik(data);
