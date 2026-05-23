@@ -1,19 +1,17 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const BACKEND = " https://d30d-140-213-187-76.ngrok-free.app";
+const BACKEND = "https://d30d-140-213-187-76.ngrok-free.app";
 
 export default function PenyimpananArsipPage() {
   const [semuaArsip, setSemuaArsip] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterTipe, setFilterTipe] = useState("semua"); // "semua", "masuk", "keluar"
+  const [filterTipe, setFilterTipe] = useState("semua"); 
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fungsi untuk update data dari backend
   const fetchSemuaArsip = async () => {
     setIsLoading(true);
     try {
-      // CACHE: "no-store" agar saat buka halaman ini, datanya langsung update!
       const res = await fetch(`${BACKEND}/api/surat`, { cache: "no-store" });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -45,28 +43,23 @@ export default function PenyimpananArsipPage() {
     fetchSemuaArsip();
   }, []);
 
-  // Filter Search dan Kategori (Semua/Masuk/Keluar)
   const filteredData = semuaArsip.filter((row) => {
     const matchSearch = [row.agenda, row.asal, row.perihal, row.jenis].join(" ").toLowerCase().includes(searchTerm.toLowerCase());
     const matchTipe = filterTipe === "semua" ? true : row.tipe === filterTipe;
     return matchSearch && matchTipe;
   });
 
-  // Statistik Real-time berdasarkan data yang di-fetch
   const totalArsip = semuaArsip.length;
   const suratMasuk = semuaArsip.filter(s => s.tipe === "masuk").length;
   const suratKeluar = semuaArsip.filter(s => s.tipe === "keluar").length;
   const adaFile = semuaArsip.filter(s => s.file_path).length;
 
   const handleBackupExcel = () => {
-    // Aksi untuk download backup excel
     window.location.href = `${BACKEND}/api/surat/export/excel`;
   };
 
   return (
     <div className="space-y-6">
-      
-      {/* 4 Kartu Statistik */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-hijau-pale/50 p-5 rounded-2xl border border-hijau/20">
           <div className="text-3xl font-black text-hijau-tua mb-1">{isLoading ? "..." : totalArsip}</div>
@@ -87,8 +80,6 @@ export default function PenyimpananArsipPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-        
-        {/* Toolbar Pencarian & Filter */}
         <div className="p-5 border-b border-border flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
           <div className="relative w-full lg:max-w-md">
             <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-abu" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -110,7 +101,6 @@ export default function PenyimpananArsipPage() {
           </div>
         </div>
 
-        {/* Tabel */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border-collapse min-w-[1200px]">
             <thead className="bg-latar border-b border-border">
@@ -143,7 +133,7 @@ export default function PenyimpananArsipPage() {
                   <td className="py-4 px-4 text-abu whitespace-nowrap">{item.no}</td>
                   <td className="py-4 px-4 font-semibold whitespace-nowrap">{item.tgl}</td>
                   <td className="py-4 px-4">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${item.b || (item.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]")}`}>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${item.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]"}`}>
                       {item.status}
                     </span>
                   </td>
@@ -162,7 +152,6 @@ export default function PenyimpananArsipPage() {
             </tbody>
           </table>
         </div>
-
       </div>
     </div>
   );

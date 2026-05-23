@@ -14,27 +14,9 @@ export default function SuratMasukPage() {
 
   useEffect(() => {
     if (registerNewSuratCallback) {
-      registerNewSuratCallback((suratBaru) => {
-        // Format data mentah dari backend agar cocok dengan nama kolom di tabel
-        const formattedBaru = {
-          id: suratBaru.id,
-          agenda: suratBaru.no_agenda,
-          jenis: suratBaru.jenis_surat,
-          asal: suratBaru.nama_pemohon,
-          perihal: suratBaru.perihal,
-          nik: suratBaru.nik || "-",
-          no: suratBaru.no_surat_asli || "-",
-          tgl: suratBaru.tanggal,
-          disp: suratBaru.disposisi,
-          status: suratBaru.status,
-          file_path: suratBaru.file_path,
-          tipe: suratBaru.jenis_surat?.toLowerCase().includes("keluar") ? "keluar" : "masuk"
-        };
-
-        // Pastikan hanya surat tipe "masuk" yang otomatis ditambahkan ke tabel
-        if (formattedBaru.tipe === "masuk") {
-          setSuratData((prev) => [formattedBaru, ...prev]);
-        }
+      registerNewSuratCallback(() => {
+        // Solusi instan: abaikan data mentah POST, langsung refetch terstruktur dari database
+        fetchSurat();
       });
       return () => registerNewSuratCallback(null);
     }
@@ -47,7 +29,6 @@ export default function SuratMasukPage() {
   const fetchSurat = async () => {
     setIsLoading(true);
     try {
-      // TAMBAHAN CACHE: "no-store" agar data selalu ditarik fresh dari Ngrok/Laptop
       const res = await fetch(`${BACKEND}/api/surat`, { cache: "no-store" });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -67,7 +48,6 @@ export default function SuratMasukPage() {
         tipe: item.jenis_surat.toLowerCase().includes("keluar") ? "keluar" : "masuk"
       }));
 
-      // Filter khusus Surat Masuk
       setSuratData(formattedData.filter(s => s.tipe === "masuk"));
     } catch {
       setSuratData([]); 
@@ -133,8 +113,6 @@ export default function SuratMasukPage() {
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
-
-        {/* Search */}
         <div className="mb-6 flex items-center gap-3">
           <div className="relative flex-1 max-w-md">
             <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-abu" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -143,7 +121,6 @@ export default function SuratMasukPage() {
           <div className="text-xs text-abu font-medium shrink-0">{filteredData.length} surat</div>
         </div>
 
-        {/* Tabel */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border-collapse min-w-[1100px]">
             <thead className="bg-latar border-b border-border">
@@ -172,7 +149,7 @@ export default function SuratMasukPage() {
                   <td className="py-4 px-4 font-semibold whitespace-nowrap">{item.tgl}</td>
                   <td className="py-4 px-4">{item.disp}</td>
                   <td className="py-4 px-4">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${item.b || (item.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]")}`}>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${item.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]"}`}>
                       {item.status}
                     </span>
                   </td>
@@ -190,12 +167,9 @@ export default function SuratMasukPage() {
         </div>
       </div>
 
-      {/* MODAL DETAIL */}
       {selectedSurat && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
-
-            {/* Header */}
             <div className="p-5 border-b border-border flex justify-between items-center bg-latar rounded-t-2xl shrink-0">
               <div>
                 <h2 className="text-lg font-bold text-hitam">Detail Dokumen</h2>
@@ -206,12 +180,8 @@ export default function SuratMasukPage() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* Preview file */}
               {renderPreview(selectedSurat)}
-
-              {/* Info detail */}
               <div className="bg-latar border border-border rounded-xl p-4 space-y-2.5 text-sm">
                 {[
                   ["Asal Surat", selectedSurat.asal],
@@ -227,24 +197,17 @@ export default function SuratMasukPage() {
                 ))}
                 <div className="flex justify-between items-center gap-4">
                   <span className="text-abu font-medium shrink-0">Status:</span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedSurat.b || (selectedSurat.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]")}`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedSurat.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]"}`}>
                     {selectedSurat.status}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Footer */}
             <div className="px-5 py-4 border-t border-border flex justify-end gap-3 bg-latar rounded-b-2xl shrink-0">
               <button onClick={() => setSelectedSurat(null)} className="px-4 py-2 border-2 border-border text-hitam rounded-lg font-bold text-xs hover:bg-white transition cursor-pointer">Tutup</button>
               <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-border text-hitam rounded-lg font-bold text-xs hover:bg-latar shadow-sm transition cursor-pointer">Cetak</button>
-              <button
-                onClick={() => handleUnduh(selectedSurat)}
-                disabled={!selectedSurat.file_path}
-                className="px-4 py-2 bg-hijau text-white rounded-lg font-bold text-xs hover:bg-hijau-tua shadow-md transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Unduh PDF
-              </button>
+              <button onClick={() => handleUnduh(selectedSurat)} disabled={!selectedSurat.file_path} className="px-4 py-2 bg-hijau text-white rounded-lg font-bold text-xs hover:bg-hijau-tua shadow-md transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">Unduh PDF</button>
             </div>
           </div>
         </div>

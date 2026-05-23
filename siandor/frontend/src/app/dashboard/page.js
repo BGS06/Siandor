@@ -14,7 +14,6 @@ export default function DashboardPage() {
   const fetchStatistik = async () => {
     setIsLoading(true);
     try {
-      // TAMBAHAN CACHE NO-STORE: Angka di dashboard langsung update!
       const res = await fetch(`${BACKEND}/api/statistik`, { cache: "no-store" }); 
       if (res.ok) {
         const data = await res.json();
@@ -33,8 +32,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      
-      {/* Header Greeting */}
       <div>
         <h1 className="text-2xl font-black text-hitam flex items-center gap-2">
           Selamat datang, Admin <span className="animate-wave origin-bottom-right">👋</span>
@@ -42,7 +39,6 @@ export default function DashboardPage() {
         <p className="text-abu text-sm mt-1">Ringkasan cepat arsip Desa Ngrandulor.</p>
       </div>
 
-      {/* Kartu Statistik */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
         <div className="bg-white p-6 rounded-2xl border border-border shadow-sm flex flex-col justify-center">
           <div className="text-4xl font-black text-hitam mb-2">
@@ -66,7 +62,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Tabel Surat Terbaru */}
       <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
         <div className="p-5 border-b border-border">
           <h2 className="text-base font-bold text-hitam">Surat Terbaru</h2>
@@ -99,7 +94,7 @@ export default function DashboardPage() {
                     <td className="px-5 py-4 text-sm font-medium text-hitam">{surat.asal}</td>
                     <td className="px-5 py-4 text-sm text-hitam">{surat.perihal}</td>
                     <td className="px-5 py-4 text-sm">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${surat.b || (surat.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]")}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${surat.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]"}`}>
                         {surat.status}
                       </span>
                     </td>
@@ -116,7 +111,6 @@ export default function DashboardPage() {
           </table>
         </div>
       </div>
-
     </div>
   );
 }

@@ -100,9 +100,7 @@ export default function DashboardLayout({ children }) {
       });
 
       if (response.ok) {
-        const suratBaru = await response.json();
-        // Memanggil callback untuk update tabel tanpa refresh
-        if (onNewSuratCallback) onNewSuratCallback(suratBaru);
+        if (onNewSuratCallback) onNewSuratCallback();
         closeModal();
       } else {
         const err = await response.json().catch(() => ({}));
