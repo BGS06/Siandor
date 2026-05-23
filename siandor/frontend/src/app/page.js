@@ -77,7 +77,7 @@ export default function LoginPage() {
           </div>
 
           <div className="relative z-10 text-xs text-white/50 font-medium">
-            &copy; 2024 Pemerintah Desa Ngrandulor
+            &copy; 2026 Pemerintah Desa Ngrandulor
           </div>
         </div>
 
