@@ -42,7 +42,6 @@ export default function DashboardLayout({ children }) {
   const [filePendukung, setFilePendukung] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Callback yang didaftarkan oleh halaman child (surat-masuk / surat-keluar)
   const [onNewSuratCallback, setOnNewSuratCallback] = useState(null);
   const registerNewSuratCallback = useCallback((fn) => {
     setOnNewSuratCallback(() => fn);
@@ -77,12 +76,12 @@ export default function DashboardLayout({ children }) {
     }
     setIsSubmitting(true);
 
-    const dateCode = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const randomCode = Math.floor(1000 + Math.random() * 9000);
+    const dateCode = new Date().toISOString().slice(0,10).replace(/-/g,""); 
+    const randomCode = Math.floor(1000 + Math.random() * 9000); 
     const generatedAgenda = `AGD-${dateCode}-${randomCode}`;
 
     const dataToSend = new FormData();
-    dataToSend.append("no_agenda", generatedAgenda);
+    dataToSend.append("no_agenda", generatedAgenda); 
     dataToSend.append("jenis_surat", formData.jenis_surat);
     dataToSend.append("nama_pemohon", formData.nama_pemohon);
     dataToSend.append("nik", formData.nik);
@@ -91,21 +90,20 @@ export default function DashboardLayout({ children }) {
     dataToSend.append("tanggal", formData.tanggal);
     dataToSend.append("status", formData.status);
     dataToSend.append("disposisi", formData.disposisi);
-
+    
     if (filePendukung) dataToSend.append("file", filePendukung);
 
     try {
-      const response = await fetch("https://dfa4-2001-448a-c030-ac9-102f-e0a3-db8d-6362.ngrok-free.app/api/surat", {
+      const response = await fetch("https://d30d-140-213-187-76.ngrok-free.app/api/surat", {
         method: "POST",
         body: dataToSend,
       });
 
       if (response.ok) {
         const suratBaru = await response.json();
+        // Memanggil callback untuk update tabel tanpa refresh
         if (onNewSuratCallback) onNewSuratCallback(suratBaru);
         closeModal();
-        
-        // Jeda waktu agar database selesai menulis sebelum refresh
       } else {
         const err = await response.json().catch(() => ({}));
         alert("Gagal menyimpan data ke database. Pesan server: " + JSON.stringify(err));
@@ -116,6 +114,7 @@ export default function DashboardLayout({ children }) {
       setIsSubmitting(false);
     }
   };
+
   const handleDrop = (e) => {
     e.preventDefault(); setIsDragging(false);
     if (e.dataTransfer.files?.[0]) setFilePendukung(e.dataTransfer.files[0]);

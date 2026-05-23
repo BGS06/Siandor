@@ -72,7 +72,9 @@ export default function LaporanPage() {
     setIsBackingUp(true);
     try {
       const url = tipe ? `${BACKEND}/api/backup?tipe=${tipe}` : `${BACKEND}/api/backup`;
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(`${BACKEND}/api/surat`, { 
+    cache: "no-store" // INI KUNCI AGAR DATA SELALU BARU
+});
       const data = await res.json();
       alert(`✅ ${data.pesan}`);
     } catch {

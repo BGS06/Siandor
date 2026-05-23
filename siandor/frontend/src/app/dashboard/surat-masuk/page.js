@@ -2,7 +2,7 @@
 import { useState, useEffect, useContext } from "react";
 import { ModalContext } from "../layout";
 
-const BACKEND = "https://dfa4-2001-448a-c030-ac9-102f-e0a3-db8d-6362.ngrok-free.app";
+const BACKEND = "https://d30d-140-213-187-76.ngrok-free.app";
 
 export default function SuratMasukPage() {
   const [suratData, setSuratData] = useState([]);
@@ -15,8 +15,26 @@ export default function SuratMasukPage() {
   useEffect(() => {
     if (registerNewSuratCallback) {
       registerNewSuratCallback((suratBaru) => {
-        // Ini kuncinya: menambahkan data baru ke daftar yang sudah ada
-        setSuratData((prev) => [suratBaru, ...prev]);
+        // Format data mentah dari backend agar cocok dengan nama kolom di tabel
+        const formattedBaru = {
+          id: suratBaru.id,
+          agenda: suratBaru.no_agenda,
+          jenis: suratBaru.jenis_surat,
+          asal: suratBaru.nama_pemohon,
+          perihal: suratBaru.perihal,
+          nik: suratBaru.nik || "-",
+          no: suratBaru.no_surat_asli || "-",
+          tgl: suratBaru.tanggal,
+          disp: suratBaru.disposisi,
+          status: suratBaru.status,
+          file_path: suratBaru.file_path,
+          tipe: suratBaru.jenis_surat?.toLowerCase().includes("keluar") ? "keluar" : "masuk"
+        };
+
+        // Pastikan hanya surat tipe "masuk" yang otomatis ditambahkan ke tabel
+        if (formattedBaru.tipe === "masuk") {
+          setSuratData((prev) => [formattedBaru, ...prev]);
+        }
       });
       return () => registerNewSuratCallback(null);
     }
@@ -29,10 +47,10 @@ export default function SuratMasukPage() {
   const fetchSurat = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND}/api/surat`);
+      // TAMBAHAN CACHE: "no-store" agar data selalu ditarik fresh dari Ngrok/Laptop
+      const res = await fetch(`${BACKEND}/api/surat`, { cache: "no-store" });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      console.log("Raw data dari backend:", data);
       
       const formattedData = data.map(item => ({
         id: item.id,
@@ -50,7 +68,7 @@ export default function SuratMasukPage() {
       }));
 
       // Filter khusus Surat Masuk
-      setSuratData(formattedData);
+      setSuratData(formattedData.filter(s => s.tipe === "masuk"));
     } catch {
       setSuratData([]); 
     } finally {

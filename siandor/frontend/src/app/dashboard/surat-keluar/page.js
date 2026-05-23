@@ -2,7 +2,7 @@
 import { useState, useEffect, useContext } from "react";
 import { ModalContext } from "../layout";
 
-const BACKEND = "https://9a6d-2001-448a-c030-ac9-61b1-d317-ad55-8a3c.ngrok-free.app/api/surat";
+const BACKEND = " https://d30d-140-213-187-76.ngrok-free.app";
 
 export default function SuratKeluarPage() {
   const [suratData, setSuratData] = useState([]);
@@ -15,22 +15,42 @@ export default function SuratKeluarPage() {
   useEffect(() => {
     if (registerNewSuratCallback) {
       registerNewSuratCallback((suratBaru) => {
-        setSuratData((prev) => [suratBaru, ...prev]);
+        const formattedBaru = {
+          id: suratBaru.id,
+          agenda: suratBaru.no_agenda,
+          jenis: suratBaru.jenis_surat,
+          asal: suratBaru.nama_pemohon,
+          perihal: suratBaru.perihal,
+          nik: suratBaru.nik || "-",
+          no: suratBaru.no_surat_asli || "-",
+          tgl: suratBaru.tanggal,
+          disp: suratBaru.disposisi,
+          status: suratBaru.status,
+          file_path: suratBaru.file_path,
+          tipe: suratBaru.jenis_surat?.toLowerCase().includes("keluar") ? "keluar" : "masuk"
+        };
+
+        // Pastikan hanya surat tipe "keluar" yang otomatis ditambahkan ke tabel
+        if (formattedBaru.tipe === "keluar") {
+          setSuratData((prev) => [formattedBaru, ...prev]);
+        }
       });
       return () => registerNewSuratCallback(null);
     }
   }, [registerNewSuratCallback]);
 
-  useEffect(() => { fetchSurat(); }, []);
+  useEffect(() => {
+    fetchSurat();
+  }, []);
 
   const fetchSurat = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND}/api/surat`);
+      // CACHE: "no-store" agar tabel Surat Keluar selalu up-to-date
+      const res = await fetch(`${BACKEND}/api/surat`, { cache: "no-store" });
       if (!res.ok) throw new Error();
       const data = await res.json();
       
-      // Translasi format Database ke format Tabel Frontend
       const formattedData = data.map(item => ({
         id: item.id,
         agenda: item.no_agenda,
@@ -49,7 +69,7 @@ export default function SuratKeluarPage() {
       // Filter khusus Surat Keluar
       setSuratData(formattedData.filter(s => s.tipe === "keluar"));
     } catch {
-      setSuratData([]); // Kosongkan tabel jika gagal
+      setSuratData([]); 
     } finally {
       setIsLoading(false);
     }
@@ -62,15 +82,17 @@ export default function SuratKeluarPage() {
   const renderPreview = (surat) => {
     if (!surat.file_path) {
       return (
-        <div className="w-full h-[180px] bg-latar rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-abu">
+        <div className="w-full h-[200px] bg-latar rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-abu">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 text-border"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <p className="font-bold text-hitam text-sm">Tidak Ada File</p>
           <p className="text-xs mt-1 text-abu">Dokumen tidak diupload saat input</p>
         </div>
       );
     }
+
     const url = `${BACKEND}${surat.file_path}`;
     const ext = surat.file_path.split(".").pop().toLowerCase();
+
     if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
       return (
         <div className="w-full rounded-xl overflow-hidden border border-border bg-latar">
@@ -78,6 +100,7 @@ export default function SuratKeluarPage() {
         </div>
       );
     }
+
     if (ext === "pdf") {
       return (
         <div className="w-full h-[280px] rounded-xl overflow-hidden border border-border">
@@ -85,8 +108,9 @@ export default function SuratKeluarPage() {
         </div>
       );
     }
+
     return (
-      <div className="w-full h-[100px] bg-latar rounded-xl border border-border flex flex-col items-center justify-center gap-2">
+      <div className="w-full h-[120px] bg-latar rounded-xl border border-border flex flex-col items-center justify-center gap-2">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-abu"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <p className="text-xs text-abu font-medium">{surat.file_path.split("/").pop()}</p>
       </div>
@@ -95,8 +119,9 @@ export default function SuratKeluarPage() {
 
   const handleUnduh = (surat) => {
     if (!surat.file_path) { alert("Tidak ada file untuk diunduh."); return; }
+    const url = `${BACKEND}${surat.file_path}`;
     const link = document.createElement("a");
-    link.href = `${BACKEND}${surat.file_path}`;
+    link.href = url;
     link.setAttribute("download", surat.file_path.split("/").pop());
     link.target = "_blank";
     document.body.appendChild(link);
@@ -105,72 +130,73 @@ export default function SuratKeluarPage() {
   };
 
   return (
-    <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
 
-      {/* Search */}
-      <div className="p-4 lg:p-5 border-b border-border flex items-center gap-4 bg-white">
-        <div className="relative flex-1 max-w-md">
-          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-abu" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-latar border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:bg-white focus:border-hijau transition" placeholder="Cari No. Agenda, Nama, atau Perihal..." />
+        {/* Search */}
+        <div className="mb-6 flex items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-abu" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-latar border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:bg-white focus:border-hijau transition" placeholder="Cari No. Agenda, Nama, atau Perihal..." />
+          </div>
+          <div className="text-xs text-abu font-medium shrink-0">{filteredData.length} surat</div>
         </div>
-        <div className="text-xs text-abu font-medium shrink-0">{filteredData.length} surat</div>
-      </div>
 
-      {/* Tabel */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[1200px]">
-          <thead className="bg-latar border-b border-border">
-            <tr>
-              {["No Agenda","Jenis","Nama / Asal Surat","Perihal","NIK","No Surat","Tanggal Kirim","Disposisi","Status","Aksi"].map((h) => (
-                <th key={h} className="px-4 py-4 text-xs font-bold text-abu uppercase whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr><td colSpan="10" className="px-4 py-10 text-center text-sm text-abu">
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin text-hijau" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                  Memuat data...
-                </div>
-              </td></tr>
-            ) : filteredData.length > 0 ? filteredData.map((row, i) => (
-              <tr key={`${row.id}-${i}`} className="border-b border-border hover:bg-latar transition-colors">
-                <td className="px-4 py-3 font-bold text-hijau-tua">{row.agenda}</td>
-                <td className="px-4 py-3 text-sm">{row.jenis}</td>
-                <td className="px-4 py-3 text-sm font-medium">{row.asal}</td>
-                <td className="px-4 py-3 text-sm">{row.perihal}</td>
-                <td className="px-4 py-3 text-sm">{row.nik}</td>
-                <td className="px-4 py-3 text-sm">{row.no}</td>
-                <td className="px-4 py-3 text-sm font-semibold whitespace-nowrap">{row.tgl}</td>
-                <td className="px-4 py-3 text-sm">{row.disp}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${row.b || (row.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]")}`}>
-                    {row.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <button onClick={() => setSelectedSurat(row)} className="text-biru text-sm font-bold hover:underline cursor-pointer">Lihat</button>
-                </td>
+        {/* Tabel */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left border-collapse min-w-[1100px]">
+            <thead className="bg-latar border-b border-border">
+              <tr>
+                {["No Agenda","Jenis","Nama / Asal Surat","Perihal","NIK","No Surat","Tanggal Kirim","Disposisi","Status","Aksi"].map((h) => (
+                  <th key={h} className="py-4 px-4 text-xs font-bold text-abu uppercase whitespace-nowrap">{h}</th>
+                ))}
               </tr>
-            )) : (
-              <tr><td colSpan="10" className="px-4 py-10 text-center text-sm font-medium text-abu">
-                {searchTerm ? `Tidak ada surat yang cocok dengan "${searchTerm}".` : "Belum ada data surat keluar."}
-              </td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {isLoading ? (
+                <tr><td colSpan="10" className="py-10 text-center text-sm text-abu">
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin text-hijau" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                    Memuat data...
+                  </div>
+                </td></tr>
+              ) : filteredData.length > 0 ? filteredData.map((item, i) => (
+                <tr key={`${item.id}-${i}`} className="hover:bg-latar transition-colors">
+                  <td className="py-4 px-4 font-bold text-hijau-tua whitespace-nowrap">{item.agenda}</td>
+                  <td className="py-4 px-4">{item.jenis}</td>
+                  <td className="py-4 px-4 font-medium">{item.asal}</td>
+                  <td className="py-4 px-4">{item.perihal}</td>
+                  <td className="py-4 px-4 text-abu">{item.nik}</td>
+                  <td className="py-4 px-4 text-abu whitespace-nowrap">{item.no}</td>
+                  <td className="py-4 px-4 font-semibold whitespace-nowrap">{item.tgl}</td>
+                  <td className="py-4 px-4">{item.disp}</td>
+                  <td className="py-4 px-4">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${item.b || (item.status === "Selesai" ? "bg-hijau-pale text-hijau-tua" : "bg-emas-pale text-[#7A5400]")}`}>
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <button onClick={() => setSelectedSurat(item)} className="text-biru text-sm font-bold hover:underline cursor-pointer">Lihat</button>
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan="10" className="py-10 text-center text-sm font-medium text-abu">
+                  {searchTerm ? `Tidak ada surat yang cocok dengan "${searchTerm}".` : "Belum ada data surat keluar."}
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* MODAL DETAIL */}
       {selectedSurat && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
-
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-latar rounded-t-2xl shrink-0">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b border-border flex justify-between items-center bg-latar rounded-t-2xl shrink-0">
               <div>
-                <h2 className="text-base font-bold text-hitam">Detail Dokumen</h2>
-                <p className="text-xs text-hijau-tua font-bold mt-0.5">{selectedSurat.agenda}</p>
+                <h2 className="text-lg font-bold text-hitam">Detail Dokumen</h2>
+                <p className="text-sm font-bold text-hijau-tua mt-0.5">{selectedSurat.agenda}</p>
               </div>
               <button onClick={() => setSelectedSurat(null)} className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-white bg-latar cursor-pointer transition text-abu">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -179,9 +205,9 @@ export default function SuratKeluarPage() {
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
               {renderPreview(selectedSurat)}
-              <div className="mt-4 space-y-2.5 bg-latar p-4 rounded-xl border border-border text-sm">
+              <div className="bg-latar border border-border rounded-xl p-4 space-y-2.5 text-sm">
                 {[
-                  ["Tujuan", selectedSurat.asal],
+                  ["Tujuan Surat", selectedSurat.asal],
                   ["Perihal", selectedSurat.perihal],
                   ["No. Surat", selectedSurat.no],
                   ["Tanggal", selectedSurat.tgl],
@@ -189,7 +215,7 @@ export default function SuratKeluarPage() {
                 ].map(([label, val]) => (
                   <div key={label} className="flex justify-between gap-4">
                     <span className="text-abu font-medium shrink-0">{label}:</span>
-                    <span className="text-hitam font-bold text-right">{val}</span>
+                    <span className="font-bold text-hitam text-right">{val}</span>
                   </div>
                 ))}
                 <div className="flex justify-between items-center gap-4">
